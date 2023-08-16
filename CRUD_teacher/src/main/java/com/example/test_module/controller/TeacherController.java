@@ -33,13 +33,12 @@ public class TeacherController extends HttpServlet {
     @Override
     public void init() {
         validators = new HashMap<>();
-        // tạo validator với name field là phone, và nó validate theo Regex Pattern
         // tạo tất các validator cho all fields.
-        // mình có thế xài cái thằng khác
         validators.put("name", new RunnableWithRegex("^[A-Za-z ]{6,20}", "name", errors));
         validators.put("hobby", new RunnableWithRegex("^[A-Za-z ]{10,20}", "hobby", errors));
         validators.put("gender", new RunnableWithRegex("^(Nam|Nu)$", "gender", errors));
         validators.put("category_id", new RunnableWithRegex( "^(1|2)$", "category", errors));
+        validators.put("dob", new RunnableWithRegex( "^(19[5-9][0-9]|2000)-(0[1-9]|1[0-2])-([0-2][1-9]|3[0-1])$", "category", errors));
 //        validators.put("dob", new RunnableWithRegex("\\\\d{2}/\\\\d{2}/\\\\d{4}", "dob", errors));
         //định nghĩa tất cả các fields
     }
@@ -148,11 +147,21 @@ public class TeacherController extends HttpServlet {
     private Teacher getValidTeacher(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
         Teacher teacher = (Teacher) AppUtil.getObjectWithValidation(req, Teacher.class,  validators); //
         if(errors.size() > 0){
-            req.setAttribute("teachersJSON", new ObjectMapper().writeValueAsString(teacher)); //hiểu dòng đơn giản là muốn gửi data qua JS thì phải xài thằng này  new ObjectMapper().writeValueAsString(user).
-            req.setAttribute("categoriesJSON", new ObjectMapper().writeValueAsString(CategoryService.getCategories()));
+            PageableRequest request = new PageableRequest(
+                    req.getParameter("search"),
+                    req.getParameter("sortField"),
+                    ESortType.valueOf(AppUtil.getParameterWithDefaultValue(req,"sortType", ESortType.DESC).toString()),
+                    Integer.parseInt(AppUtil.getParameterWithDefaultValue(req, "page", "1").toString()),
+                    Integer.parseInt(AppUtil.getParameterWithDefaultValue(req, "limit", "5").toString())
+            ); //tao doi tuong pageable voi parametter search
+
+            req.setAttribute("pageable", request);
+            req.setAttribute("teachers", TeacherService.getTeacherService().getTeachers(request)); // gửi qua list users để jsp vẻ lên trang web
+            req.setAttribute("teachersJSON", new ObjectMapper().writeValueAsString(TeacherService.getTeacherService().getTeachers(request)));
             req.setAttribute("genderJSON", new ObjectMapper().writeValueAsString(EGender.values()));
+            req.setAttribute("categoriesJSON", new ObjectMapper().writeValueAsString(CategoryService.getCategories()));
             req.setAttribute("message","Something was wrong");
-            req.getRequestDispatcher(PAGE + AppConstant.CREATE_PAGE)
+            req.getRequestDispatcher(PAGE + AppConstant.LIST_PAGE)
                     .forward(req,resp);
         }
         return teacher;
